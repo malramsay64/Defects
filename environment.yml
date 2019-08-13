@@ -19,6 +19,8 @@ dependencies:
   - isort=4.3.21
   - pylint=2.3.1
   - jupytext=1.2.1
+  - flake8=3.7.7
+  - flake8-docstrings=1.3.1
   # Interactive analysis
   - scikit-learn=0.21.*
   - joblib=0.13.2
