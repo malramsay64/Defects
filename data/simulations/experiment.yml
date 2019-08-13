@@ -1,0 +1,67 @@
+jobs:
+  # Create initial crystal structure
+  - command:
+      cmd: >
+        sdrun
+        --temperature {init_temp}
+        --pressure {pressure}
+        --space-group {crystal}
+        --lattice-lengths {cell_dims}
+        create
+        {creates}
+      creates: output/Trimer-P{pressure}-T{init_temp}-{crystal}.gsd
+
+    # Remove the molecules from the crystal creating defects
+  - command:
+      cmd: >
+        python3 ../../src/simulations.py
+        --remove {removed}
+        --layers {layers}
+        --direction {direction}
+        --cell-dimensions {cell_dims}
+        --cell-molecules 2
+        {requires}
+        {creates}
+      requires: output/Trimer-P{pressure}-T{init_temp}-{crystal}.gsd
+      creates: output/Trimer-P{pressure}-T{init_temp}-{crystal}-D{layers}{direction}{removed}.gsd
+
+    # Run simulation relaxing the resulting defects
+  - command:
+      cmd: >
+        sdrun
+        --temperature {temperature}
+        --pressure {pressure}
+        --space-group {crystal}
+        --lattice-lengths {cell_dims}
+        --num-steps {steps}
+        equil
+        --equil-type crystal
+        {requires}
+        {creates}
+      requires: output/Trimer-P{pressure}-T{init_temp}-{crystal}-D{layers}{direction}{removed}.gsd
+      creates: output/Trimer-P{pressure}-T{init_temp}-{crystal}-D{layers}{direction}{removed}-S{steps}.gsd
+
+
+variables:
+  init_temp: 0.20
+  pressure: 13.50
+  cell_dims: 40 32
+  crystal: p2
+  direction:
+    - H
+    - V
+  layers: 1
+  removed:
+    - 4
+    - 8
+    - 12
+    - 14
+  zip:
+    temperature:
+      - 0.20
+      - 1.30
+      - 1.40
+    steps:
+      - 1_000
+      - 500
+      - 100
