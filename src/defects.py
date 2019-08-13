@@ -9,22 +9,22 @@
 """Helper functions for the creation and analysis of defects."""
 
 import logging
+from pathlib import Path
 from typing import List, Tuple
 
-import gsd.hoomd
-import hoomd
-import joblib
 import numpy as np
 from bokeh.layouts import gridplot
 from bokeh.plotting import Figure
 from hoomd.data import SnapshotParticleData, make_snapshot
 from sdanalysis import HoomdFrame
-from sdanalysis.figures import configuration
-from sdanalysis.order import compute_ml_order
+from sdanalysis.figures import plot_frame
+from sdanalysis.order import create_ml_ordering
 from sdrun import SimulationParams, initialise, simulation
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+knn_ordering = create_ml_ordering(Path(__file__).parent / "../models/knn-trimer.pkl")
 
 
 def remove_molecule(snapshot: SnapshotParticleData, index: int) -> SnapshotParticleData:
@@ -33,21 +33,26 @@ def remove_molecule(snapshot: SnapshotParticleData, index: int) -> SnapshotParti
     Args
     ----
         snapshot: Snapshot from which a particle will be removed.
-        index: The index of the molecule to remove. This index is the zero indexed body of the
-            particle. All particles with the same body index will also be removed from the snapshot.
+
+        index: The index of the molecule to remove. This index is the zero indexed body
+            of the particle. All particles with the same body index will also be removed
+            from the snapshot.
 
     Returns
     -------
         A new snapshot with one less molecule.
 
-    The removal of a molecule is done by creating a new snapshot with N fewer particles, where N is
-    the number of particles in a molecule. This approach is simpler than modifying the existing
-    snapshot, and ensures a valid configuration once the molecule has been removed.
+    The removal of a molecule is done by creating a new snapshot with N fewer particles,
+    where N is the number of particles in a molecule. This approach is simpler than
+    modifying the existing snapshot, and ensures a valid configuration once the molecule
+    has been removed.
 
     ... note:
-        The index of molecules changes when this function is applied. All molecule ids need to be
-        contiguous, so on the removal of a molecule the largest molecule id is removed, so all molecule
-        IDs between ``index`` and the number of bodies will have shifted by 1.
+
+        The index of molecules changes when this function is applied. All molecule ids
+        need to be contiguous, so on the removal of a molecule the largest molecule id
+        is removed, so all molecule IDs between ``index`` and the number of bodies will
+        have shifted by 1.
 
     """
     mask = snapshot.particles.body != index
@@ -237,30 +242,16 @@ def remove_vertical_cell(
     return snapshot
 
 
-def knn_model():
-    return joblib.load("../models/knn-trimer.pkl")
-
-
-def plot_snapshot(snapshot: SnapshotParticleData, order: bool = False):
-    """Helper function to plot a single snapshot."""
-    frame = HoomdFrame(snapshot)
-    if order:
-        from functools import partial
-
-        def order_function(*args, **kwargs):
-            result = compute_ml_order(knn_model(), *args, **kwargs)
-            return result == "liq"
-
-        return configuration.plot_frame(frame, order_function)
-    return configuration.plot_frame(frame)
-
-
 def plot_snapshots(
     snapshots, num_columns: int = 2, num_rows: int = None, order: bool = False
 ):
     # Length of sides to make a square
     if num_rows is None:
         num_rows = len(snapshots) // num_columns
+
+    order_func = None
+    if order:
+        order_func = knn_ordering
     figures = []
     for i in range(num_columns):
         row: List[Figure] = []
@@ -268,7 +259,9 @@ def plot_snapshots(
             if i * num_rows + j > len(snapshots):
                 figures.append(row)
                 return gridplot(figures)
-            fig = plot_snapshot(snapshots[i * num_rows + j], order=order)
+            fig = plot_frame(
+                HoomdFrame(snapshots[i * num_rows + j]), order_function=order_func
+            )
             fig.plot_height = fig.plot_height // num_rows
             fig.plot_width = fig.plot_width // num_rows
             row.append(fig)
