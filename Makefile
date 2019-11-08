@@ -3,10 +3,6 @@
 # Malcolm Ramsay, 2019-08-13 10:13
 #
 
-all:
-	@echo "Makefile needs your attention"
-
-
 #
 # Notebook rules
 #
@@ -28,12 +24,27 @@ sync:
 .PHONY: figures
 figures: notebooks ## Generate all the figures in the figures directory
 
+#
+# Report Targets
+#
+
+report_targets := $(wildcard reports/*.md)
+all_figures := $(wildcard figures/*.svg)
+
+convert_figures: $(all_figures:.svg=.pdf)
+
+reports: $(report_targets:.md=.pdf) ## Generate reports
+	echo $<
+
+%.pdf: %.md $(all_figures:.svg=.pdf)
+	cd $(dir $<); pandoc $(notdir $<) --filter pandoc-crossref -o $(notdir $@)
+
+%.pdf: %.svg
+	cairosvg $< -o $@
+
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
-
-# vim:ft=make
-#
 
 # vim:ft=make
 #
